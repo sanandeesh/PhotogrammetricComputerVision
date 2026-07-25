@@ -103,7 +103,7 @@ Download KITTI data from `https://www.cvlibs.net/datasets/kitti/raw_data.php` (e
 
 # Run Foundational V-SLAM\INS Algorithms from Other Labs
 
-I have cloned, compiled, and run foundational V-SLAM\INS algorithms from across the world, and provided results below.
+I have studied, compiled, and run foundational V-SLAM\INS algorithms from across the world, and provided results below.
 
 ## ORB-SLAM2 from Universidad de Zaragoza (Raúl Mur-Artal et al)
 - **Original Project Page**: https://webdiis.unizar.es/~raulmur/orbslam/
