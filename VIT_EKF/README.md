@@ -150,18 +150,19 @@ The standard Homogenous Camera projection is given as:
 $$
 PX = \begin{bmatrix} f_x & 0.0 & p_x & 0.0 \\ 
                      0.0 & f_y & p_y & 0.0 \\ 
-                     0.0 & 0.0 & 1.0 & 0.0 \end{bmatrix}$ $\begin{bmatrix} x \\ 
+                     0.0 & 0.0 & 1.0 & 0.0 \end{bmatrix}   \begin{bmatrix} x \\ 
                                                                            y \\ 
-                                                                           z \\ 1 \end{bmatrix}
+                                                                           z \\ 
+                                                                           1.0 \end{bmatrix}
 $$
 
 We reduce it to 2x3 to match our non-homogenous state\measurement spaces, and include the normalization by $z$:
 
 $$
 PX = \begin{bmatrix} \frac{f_x}{Z} & 0.0 & \frac{c_x}{Z} \\ 
-                      0.0 & \frac{f_y}{Z} & \frac{c_y}{Z} \end{bmatrix}$ $\begin{bmatrix} x \\ 
+                      0.0 & \frac{f_y}{Z} & \frac{c_y}{Z} \end{bmatrix}   \begin{bmatrix} x \\ 
                                                                                           y \\ 
-                                                                                          z\end{bmatrix}
+                                                                                          z  \end{bmatrix}
 $$
 
 The normalization makes this a **non-linear model**, and hence it must be linearized into a Jacobian for usage in the Measurement-Correction step.
