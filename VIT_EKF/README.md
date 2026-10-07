@@ -233,6 +233,7 @@ The Feature-Tracking algorithm stubbornly re-assigns the track to nearby similar
 ## V. Conclusions, Open Points, & Follow-Up Steps
 
 The main "contribution\discovery" of this mini-project is the Jacobian of the (normalized non-homogenous) camera projection model: 
+
 $$
     \boxed{H = \begin{bmatrix} \frac{f_x}{Z} & 0.0 & -\frac{f_x \cdot X}{Z^2} \\ 0.0 & \frac{f_y}{Z} & -\frac{f_y \cdot Y}{Z^2} \end{bmatrix}}
 $$
