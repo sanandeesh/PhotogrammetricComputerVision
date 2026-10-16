@@ -1,5 +1,5 @@
-# Photogrammetric ComputerVision
-A deep dive into classical & modern 3D Computer Vision concepts and techniques applied to the world famous stereo camera "KITTI Dataset"
+# ComputerVision Deep Dive
+Covers classical & modern 3D Computer Vision concepts and techniques applied to the world famous stereo camera "KITTI Dataset"
 
 ## I. (Semi) Monocular Visual Inertial Tracking with EKF
 Please see the [VIT-EKF README](VIT_EKF/README.md) for **full description** of the filter.
@@ -14,7 +14,23 @@ The 3D coordinates of visual features are triangulated and tracked (in the camer
     <img src="./images/vitekf_full.png" alt="VIT EKF Output" width="100%">
 </div>
 
-## II. DLT Triangulation of Point Pairs from KITTI Stereo Cameras
+## II. Object Detection/Classification + Tracking with PyTorch & ByteTrack
+
+[Full Video Recordings on YouTube](https://www.youtube.com/watch?v=-06SrHwsEzM&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=4)
+
+- **Object Detection & Classification** with PyTorch via [Faster R-CNN](https://docs.pytorch.org/vision/stable/models/faster_rcnn.html) with a [ResNet-50-FPN backbone](https://docs.pytorch.org/vision/stable/models/generated/torchvision.models.detection.fasterrcnn_resnet50_fpn_v2.html#torchvision.models.detection.fasterrcnn_resnet50_fpn_v2) using Pre-Trained weights (no refinement with KITTI images).
+- **Object Tracking** with [ByteTrack](https://github.com/roboflow/trackers) by `trackers` package.
+
+<div align="center">
+    <img src="./images/ObjDetTracking_Flow.png" alt="Obj Detection Tracking Flow" width="100%">
+</div>
+
+<div align="center">
+    <img src="./images/ObjDetection_ExampleOutputs.png" alt="Object Detection Tracking Examples" width="90%">
+</div>
+ 
+
+## III. DLT Triangulation of Point Pairs from KITTI Stereo Cameras
 
 Please watch: 
 [Full Video Recordings on YouTube](https://www.youtube.com/watch?v=w3AwZM1RpVQ&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=1)
@@ -46,7 +62,7 @@ The math is implemented from scratch with `numpy` in `main_stereo_dlt_triangulat
 Note how the triangulation resolution diminishes rapidly along the Line-of-Sight (Z axis).
 Point color represents Z-Axis depth. 
 
-## III. Optical Flow from KITTI Camera Sequance
+## IV. Optical Flow from KITTI Camera Sequance
 
 [Full Video Recordings on YouTube](https://www.youtube.com/watch?v=mm-BLc3SGRY&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=7)
 
@@ -78,7 +94,6 @@ The math is implemented from scratch with `numpy` is `main_optical_flow.py`
 </div>
 
 ## Installation:
-Only `numpy, matplotlib, scipy, scikit-image, pytest` packages are required for this script.
 
 To run within a virtual environment, create a separate virtual environment for the new project 
 
@@ -98,6 +113,10 @@ Download KITTI data from `https://www.cvlibs.net/datasets/kitti/raw_data.php` (e
 `python3 main_stereo_dlt_triangulation.py` Run DLT Triangulation over example image pair
 
 `python3 main_optical_flow.py` Run Optical Flow over example image pair
+
+`python3 main_object_detection_track.py \` <br>
+`        --images 2011_09_26/2011_09_26_drive_0001_sync/image_02/data \` <br>
+`        --out drive0001_tracked.mp4` Run Object Detection & Tracking over left color camera
 
 `deactive` Deactivate Virtual Environment before closing terminal.
 
