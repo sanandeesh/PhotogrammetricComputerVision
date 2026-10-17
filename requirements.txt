@@ -2,4 +2,15 @@ numpy
 matplotlib
 scipy
 scikit-image
+open3d
 pytest
+rosbags>=0.9.11
+pyproj
+opencv-python
+sympy
+
+torch>=2.0
+torchvision>=0.15
+supervision
+trackers
+tqdm
