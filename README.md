@@ -1,17 +1,22 @@
 # ComputerVision Deep Dive
 Covers classical & modern 3D Computer Vision concepts and techniques applied to the world famous stereo camera "KITTI Dataset"
 
-## I. (Semi) Monocular Visual Inertial Tracking with EKF
-Please see the [VIT-EKF README](VIT_EKF/README.md) for **full description** of the filter.
+## I. Stereo Visual-Inertial Object Tracking (VIT) with Extended Kalman Filter (EKF)
+**Please read the** [VIT-EKF README](VIT_EKF/README.md) **for full description of the filter.**
 
-[Full Video Recordings on YouTube](https://www.youtube.com/watch?v=qI3MzEmzQrs&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=1)
+[Full Video Recordings on YouTube](https://www.youtube.com/watch?v=zfjkMU6sCOw&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=1)
 
-The 3D coordinates of visual features are triangulated and tracked (in the camera Ego-Frame) with an EKF. Hence, each track is a _3D Gaussian distribution_: a (3,1) mean $\mu$ and (3,3) covariance $\Sigma$.
-- The Prediction Step extrapolates the Track-Distribution using IMU-derived forward\lateral translation & yaw\pitch rotation. 
-- The Measurement-Correction Step applies the Jacobian of the (normalized non-homogenous) Camera Projection (i.e. Measurement) model. 
+This EKF tracks 3D points (3x1 Mean & 3x3 Covariance) observed as 2D visual features in stereo camera pair across video sequence (KITTI).
+Tracks are initialized as 3D DLT triangulation between image feature point pairs.
+
+Lukas-Kanade tracks a point observation in Left Camera across time, and Template-Matching finds the corresponding point in Right Camera.
+
+- The Prediction Step propagates the Track-Distributions using IMU-based forward\lateral translation & yaw\pitch rotation velocities.
+- The Measurement Model is the standard 3x4 **Camera-Projection Matrix** $P$. 
+- The Measurement-Correction Step residual is the "Reprojection Error" (i.e. difference between observed and expected pixel coordinates) and uses a 2x3 Jacobian of the non-linear (i.e. non-homogenous normalized-by-Z) $P$. (see [README](VIT_EKF/README.md))
 
 <div align="center">
-    <img src="./images/vitekf_full.png" alt="VIT EKF Output" width="100%">
+    <img src="./images/SVIT_OutputDisplay.png" alt="SVIT EKF Output" width="100%">
 </div>
 
 ## II. Object Detection/Classification + Tracking with PyTorch & ByteTrack
