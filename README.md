@@ -6,17 +6,21 @@ Covers classical & modern 3D Computer Vision concepts and techniques applied to 
 
 [Full Video Recordings on YouTube](https://www.youtube.com/watch?v=zfjkMU6sCOw&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=1)
 
-This EKF tracks 3D points (3x1 Mean & 3x3 Covariance) observed as 2D visual features in stereo camera pair across video sequence (KITTI).
-Tracks are initialized as 3D DLT triangulation between image feature point pairs.
-
-Lukas-Kanade tracks a point observation in Left Camera across time, and Template-Matching finds the corresponding point in Right Camera.
-
-- The Prediction Step propagates the Track-Distributions using IMU-based forward\lateral translation & yaw\pitch rotation velocities.
-- The Measurement Model is the standard 3x4 **Camera-Projection Matrix** $P$. 
-- The Measurement-Correction Step residual is the "Reprojection Error" (i.e. difference between observed and expected pixel coordinates) and uses a 2x3 Jacobian of the non-linear (i.e. non-homogenous normalized-by-Z) $P$. (see [README](VIT_EKF/README.md))
+This EKF tracks 3D points ($3 \times 1$ Mean & $3 \times 3$ Covariance) observed as 2D visual features in stereo camera pair across video sequence (KITTI).
 
 <div align="center">
-    <img src="./images/SVIT_OutputDisplay.png" alt="SVIT EKF Output" width="100%">
+    <img src="./images/SVIT_Diagram.png" alt="SVIT EKF Output" width="60%">
+</div>
+
+Tracks are initialized as 3D **DLT Triangulation** between image feature point pairs.
+**Lukas-Kanade Optical Flow** tracks a point observation in Left Camera across time, and **Template-Matching** finds the corresponding point in Right Camera.
+
+- The Prediction Step propagates the Track-Distributions using IMU-based forward\lateral translation & yaw\pitch rotation velocities.
+- The Measurement Models are the standard 3x4 **Camera-Projection Matrices** $P_{Left}, P_{Right}$. 
+- The Measurement-Correction Step residual is the "Reprojection Error" (i.e. difference between observed and expected pixel coordinates) and uses a 2x3 **Jacobian** of the non-linear (i.e. non-homogenous normalized-by-Z) $P$. (see [README](VIT_EKF/README.md))
+
+<div align="center">
+    <img src="./images/SVIT_OutputDisplay.png" alt="SVIT EKF Output" width="80%">
 </div>
 
 ## II. Object Detection/Classification + Tracking with PyTorch & ByteTrack
