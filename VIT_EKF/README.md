@@ -1,12 +1,11 @@
-# (Semi) Monocular Visual-Inertial-Tracking with EKF
+# Stereo Visual-Inertial Object Tracking with EKF
 
 Please Watch [Full Video Recordings on YouTube](https://www.youtube.com/watch?v=qI3MzEmzQrs&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=1)
 
-**Summary:** 
-Given the KITTI stereo-camera dataset, **track the 3D position of points** in the **local frame of the Left Camera**.
-The track positions **initialize** as triangulation between Left\Right cameras.
-However, the track positions are Measurement-Corrected over time using **only** the left camera.
-Hence, this algorithm is labelled "***(Semi)** Monocular*".
+## Summary 
+
+Given the KITTI stereo-camera dataset, **track the 3D position of points** in the **local frame of the Left Camera**. 
+The vehicle-sensor setup is shown below.
 
 <div align="center">
     <img src="../images/VehicleSensorSetup.png" alt="Sensor Setup" width="55%">
@@ -14,16 +13,31 @@ Hence, this algorithm is labelled "***(Semi)** Monocular*".
 
 **Fig 1**: KITTI Recording Platform *(Geiger et al, 2013)*
 
+The Kalman Filter design is shown below.
+<div align="center">
+    <img src="../images/SVIT_Diagram.png" alt="SVIT EKF Output" width="60%">
+</div>
+
+**Fig 2**: Stereo Visual Inertial Object Tracking EKF
+
+Tracks are initialized as 3D **DLT Triangulation** between image feature point pairs.
+**Lukas-Kanade Optical Flow** tracks a point observation in Left Camera across time, and **Template-Matching** finds the corresponding point in Right Camera.
+
+- The Prediction Step propagates the Track-Distributions with IMU-based forward\lateral translation & yaw\pitch rotation velocities.
+- The Measurement Models are the standard 3x4 **Camera-Projection Matrices** $P_{Left}, P_{Right}$. 
+- The Measurement-Correction Step residual is the "Reprojection Error" (i.e. difference between observed and expected pixel coordinates) and uses a 2x3 **Jacobian** of the non-linear (i.e. non-homogenous normalized-by-Z) $P$.
+
 ## I. Feature Detection, Initialization, & Tracking
-Features in Left Camera are detected via **Shi-Tomasi Corner Detection** provided by `cv2.goodFeaturesToTrack`.
+Upon Track Initialization, features in Left Camera are detected via **Shi-Tomasi Corner Detection** provided by `cv2.goodFeaturesToTrack`.
 The optimal matching pixel coordinate is found in the Right Camera via `ski.feature.match_template()`. 
 The Each pixel coordinate pair is (with the calibrated Left & Right 3x4 camera matrices) triangulated via `cv2.triangulatePoints()`. 
-The results are in meters.
+The DLT Triangulation is **only** used for Track initialization, and never again. The resulting coordinates are in meters.
 The (moving) Left Camera is the Origin coordinate system defined as: 
 
 `x = right, y = down, z = forward`. 
 
 Features are tracked over successive frames via **Lukas-Kanade Optical Flow** provided by `cv2.calcOpticalFlowPyrLK()`.
+The same Template-Matching is used on each time-step/frame to find the Right-Image correspondence.
 A new feature is initialized each time a feature leaves the field of view, or is lost by the tracker.
 
 ## 2. State Space & Prediction Step
@@ -178,7 +192,7 @@ Given:
 
 **Tracked Feature** $f_i$
 
-**Kalman Gain** $K = \Sigma_\text{pred}H^T (H\Sigma_\text{pred}H^T + R)$,
+**Kalman Gain** $K = \Sigma_\text{pred}H^T (H\Sigma_\text{pred}H^T + R)^{-1}$,
 
 the optimal\corrected track distribution becomes:
 
