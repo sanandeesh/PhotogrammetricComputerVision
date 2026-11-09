@@ -1,4 +1,4 @@
-# Stereo Visual-Inertial Object Tracking with EKF
+# Stereo Visual-Inertial Object Tracking with Iterated-EKF
 
 Please Watch [Full Video Recordings on YouTube](https://www.youtube.com/watch?v=qI3MzEmzQrs&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=1)
 
@@ -13,25 +13,36 @@ The vehicle-sensor setup is shown below.
 
 **Fig 1**: KITTI Recording Platform *(Geiger et al, 2013)*
 
-The Kalman Filter design is shown below.
+This EKF tracks 3D points ($3 \times 1$ Mean & $3 \times 3$ Covariance) observed as 2D visual features in a stereo camera pair across video sequence (KITTI), in the Left-Camera Frame.
+
 <div align="center">
     <img src="../images/SVIT_Diagram.png" alt="SVIT EKF Output" width="60%">
 </div>
 
-**Fig 2**: Stereo Visual Inertial Object Tracking EKF
+**Fig 2**: Stereo Visual Inertial Object Tracking with I-EKF
 
 Tracks are initialized as 3D **DLT Triangulation** between image feature point pairs.
 **Lukas-Kanade Optical Flow** tracks a point observation in Left Camera across time, and **Template-Matching** finds the corresponding point in Right Camera.
 
-- The Prediction Step propagates the Track-Distributions with IMU-based forward\lateral translation & yaw\pitch rotation velocities.
-- The Measurement Models are the standard 3x4 **Camera-Projection Matrices** $P_{Left}, P_{Right}$. 
-- The Measurement-Correction Step residual is the "Reprojection Error" (i.e. difference between observed and expected pixel coordinates) and uses a 2x3 **Jacobian** of the non-linear (i.e. non-homogenous normalized-by-Z) $P$.
+- The Prediction Step propagates the Track-Distributions using IMU-based translational & rotational velocities.
+- The $4 \times 1$ measurement-vector $z$ vertically stacks both $2 \times 1$ $(row, col)$ pixels, $z_{left}$ and $z_{right}$. i.e. The observations in both cameras constitute a **single Measurement**, and are processed in a **single Correction Step**. 
+- The Measurement Model is the standard $3 \times 4$ **Camera-Projection Matrix** $\mathbf{P}$, followed by the _divide-by-z_ normalization of the Homogeneous Coordinate (Hartley, 2003). Hence, **the model is non-linear** $z = h(x)$. The $4 \times 3$ Measurement Jacobian $\mathbf{H}$ vertically stacks both $2 \times 3$ Measurement Jacobians $H_{left}$ and $H_{right}$. 
+- The $4 \times 1$ residual/innovation vector is the "Reprojection Error", $z - h(\hat{x})$ (i.e. difference between observed and predicted pixel coordinates).
+
+**Iterated**-EKF: Although the Correction Step repeats the Mean Update until either **(a)** the residual falls below a threshold ($2$ pixels), or **(b)** N iterations pass, ... the majority of tracks achieve post-correction residuals below $2$ pixels **after a single correction** (i.e. no subsequent Iterations required). 
+
+<div align="center">
+    <img src="../images/SVIT_OutputDisplay.png" alt="SVIT EKF Output" width="80%">
+</div>
+
+**Fig 3**: EKF Visualization Screenshot (see YT link for full videos)
 
 ## I. Feature Detection, Initialization, & Tracking
 Upon Track Initialization, features in Left Camera are detected via **Shi-Tomasi Corner Detection** provided by `cv2.goodFeaturesToTrack`.
 The optimal matching pixel coordinate is found in the Right Camera via `ski.feature.match_template()`. 
 The Each pixel coordinate pair is (with the calibrated Left & Right 3x4 camera matrices) triangulated via `cv2.triangulatePoints()`. 
-The DLT Triangulation is **only** used for Track initialization, and never again. The resulting coordinates are in meters.
+The DLT Triangulation is **only** used for Track initialization, and never again. 
+The resulting coordinates are in meters.
 The (moving) Left Camera is the Origin coordinate system defined as: 
 
 `x = right, y = down, z = forward`. 
