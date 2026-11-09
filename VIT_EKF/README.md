@@ -168,47 +168,75 @@ As expected, the Predicted Covariance matrix $\Sigma_\text{pred}$ _diffuses_ alo
 
 i.e. noise in camera yaw\pitch adds uncertainty horizontally\vertically and increasingly so as a function of point distance $z$ (_like a lever-arm_).
 
-## III. Camera-Projection Model & Correction Step
-### 3.1 Compute Jacobian of Projection Model $H$
-The standard Homogenous Camera projection is given as:
+## III. Camera Projection Model & Correction Step
+Each camera observes $2 \times 1$ feature (origin is the upper left corner of the image):
 
 $$
-PX = \begin{bmatrix} f_x & 0.0 & p_x & 0.0 \\ 
-                     0.0 & f_y & p_y & 0.0 \\ 
+z_{cam} = \begin{bmatrix} x_{row}  \\ 
+                          y_{col} \end{bmatrix}   
+$$
+
+The EKF measurement vector is $4 \times 1$
+
+$$
+z  = \begin{bmatrix} z_{Left}  \\ 
+                     z_{Right} \end{bmatrix}   
+$$
+
+### 3.1 Compute Jacobian of Projection Model $H$
+The standard $3 \times 4$ Camera projection $\mathbf{P}$ is applied to world point $\mathbf{x}$ as:
+
+$$
+PX = \begin{bmatrix} f_x & 0.0 & p_x & f_{x}b_{x} \\ 
+                     0.0 & f_y & p_y & 0.0        \\ 
                      0.0 & 0.0 & 1.0 & 0.0 \end{bmatrix}   \begin{bmatrix} x \\ 
                                                                            y \\ 
                                                                            z \\ 
                                                                            1.0 \end{bmatrix}
 $$
 
-We reduce it to 2x3 to match our non-homogenous state\measurement spaces, and include the normalization by $z$:
+where the baseline $b_x$ is $0.0$ for Left-Cam, and $0.54$ for Right-Cam.
+The homogeneous coordinate is normalized and removed by dividing the result by $z$.
 
 $$
-PX = \begin{bmatrix} \frac{f_x}{Z} & 0.0 & \frac{c_x}{Z} \\ 
-                      0.0 & \frac{f_y}{Z} & \frac{c_y}{Z} \end{bmatrix}   \begin{bmatrix} x \\ 
-                                                                                          y \\ 
-                                                                                          z  \end{bmatrix}
+h(\mathbf{x}) = \begin{bmatrix} \frac{f_x}{Z} &           0.0 & \frac{c_x}{Z} & \frac{f_{x}b_{x}}{Z} \\ 
+                                         0.0  & \frac{f_y}{Z} & \frac{c_y}{Z} &       0.0        \end{bmatrix}  \begin{bmatrix} x \\ 
+                                                                                                                                y \\ 
+                                                                                                                                z \\ 
+                                                                                                                               1.0 \end{bmatrix}
 $$
 
-The normalization makes this a **non-linear model**, and hence it must be linearized into a Jacobian for usage in the Measurement-Correction step.
+$$
+h(\mathbf{x}) = \begin{bmatrix} h_{Left}(\mathbf{x}) \\ 
+                                h_{Right}(\mathbf{x}) \end{bmatrix}
+$$
+
+The normalization makes $h(\mathbf{x})$ a **non-linear model**, and hence it must be linearized into a Jacobian for usage in the Measurement-Correction step.
 
 $$
-    \boxed{H = \begin{bmatrix} \frac{f_x}{Z} & 0.0 & -\frac{f_x \cdot X}{Z^2} \\ 
-                               0.0 & \frac{f_y}{Z} & -\frac{f_y \cdot Y}{Z^2} \end{bmatrix}}
+    \boxed{\mathbf{H} = \begin{bmatrix} \frac{f_x}{Z} & 0.0 & -\frac{f_x \cdot X}{Z^2} -\frac{f_{x}b_{x}}{Z^2} \\ 
+                                                  0.0 & \frac{f_y}{Z} & -\frac{f_y \cdot Y}{Z^2}                           \end{bmatrix}}
+$$
+
+The $3 \times 4$ Measurement Jacobian is:
+
+$$
+    \boxed{\mathbf{H} = \begin{bmatrix} \mathbf{H}_{Left} \\ 
+                                        \mathbf{H}_{Right} \end{bmatrix}}
 $$
 
 This "Projection Jacobian" is the **key** to the Measurement Correction, as shown below.
 ### 3.2 Measurement Correction of Prediction
 Given:
 
-**Tracked Feature** $f_i$
+**Tracked Feature** $z$
 
 **Kalman Gain** $K = \Sigma_\text{pred}H^T (H\Sigma_\text{pred}H^T + R)^{-1}$,
 
 the optimal\corrected track distribution becomes:
 
 $$
-    \mu_\text{corrected} = \mu_\text{pred} + K (f_i - P_\text{Left}\mu_\text{pred})
+    \mu_\text{corrected} = \mu_\text{pred} + K (z - h(\mu_\text{pred}))
 $$
 
 $$
