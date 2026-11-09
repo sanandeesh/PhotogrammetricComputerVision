@@ -1,5 +1,5 @@
 # ComputerVision Deep Dive
-Applies classical & modern 3D Computer Vision concepts and techniques to the preeminent stereo camera "KITTI Dataset" (Geiger, 2013).
+Applies classical & modern 3D Computer Vision concepts and techniques to the preeminent **KITTI** stereo camera dataset (Geiger, 2013).
 
 ## I. Stereo Visual-Inertial Object Tracking with Iterated-EKF
 `main_visual_inertial_tracking_EKF.py`
@@ -22,7 +22,7 @@ Tracks are initialized as 3D **DLT Triangulation** between image feature point p
 - The Measurement Model is the standard $3 \times 4$ **Camera-Projection Matrix** $\mathbf{P}$, followed by the _divide-by-z_ normalization of the Homogeneous Coordinate (Hartley, 2003). Hence, **the model is non-linear** $z = h(x)$. The $4 \times 3$ Measurement Jacobian $\mathbf{H}$ vertically stacks both $2 \times 3$ Measurement Jacobians $H_{left}$ and $H_{right}$. 
 - The $4 \times 1$ residual/innovation vector is the "Reprojection Error", $z - h(\hat{x})$ (i.e. difference between observed and predicted pixel coordinates).
 
-**Iterated**-EKF: Although the Correction Step repeats the Mean Update until either **(a)** the residual falls below a threshold ($2$ pixels), or **(b)** N iterations pass (hence, this is termed _Iterated_ EKF), ... the majority of tracks have post-correction residuals below $2$ pixels **after a single correction** (i.e. no Iterations required). 
+**Iterated**-EKF: Although the Correction Step repeats the Mean Update until either **(a)** the residual falls below a threshold ($2$ pixels), or **(b)** N iterations pass, ... the majority of tracks achieve post-correction residuals below $2$ pixels **after a single correction** (i.e. no subsequent Iterations required). 
 (see [README](VIT_EKF/README.md) for rigorous details.)
 
 <div align="center">
