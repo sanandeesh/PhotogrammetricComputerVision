@@ -1,12 +1,14 @@
 # ComputerVision Deep Dive
-Covers classical & modern 3D Computer Vision concepts and techniques applied to the world famous stereo camera "KITTI Dataset"
+Applies classical & modern 3D Computer Vision concepts and techniques to the preeminent stereo camera "KITTI Dataset" (Geiger, 2013).
 
-## I. Stereo Visual-Inertial Object Tracking (VIT) with Extended Kalman Filter (EKF)
+## I. Stereo Visual-Inertial Object Tracking with Iterated-EKF
+`main_visual_inertial_tracking_EKF.py`
+
 **Please read the** [VIT-EKF README](VIT_EKF/README.md) **for full description of the filter.**
 
-[Full Video Recordings on YouTube](https://www.youtube.com/watch?v=zfjkMU6sCOw&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=1)
+[Full Video Recordings on YouTube](https://www.youtube.com/watch?v=tfgrQTp6jsU&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=1)
 
-This EKF tracks 3D points ($3 \times 1$ Mean & $3 \times 3$ Covariance) observed as 2D visual features in stereo camera pair across video sequence (KITTI).
+This EKF tracks 3D points ($3 \times 1$ Mean & $3 \times 3$ Covariance) observed as 2D visual features in a stereo camera pair across video sequence (KITTI), in the Left-Camera Frame.
 
 <div align="center">
     <img src="./images/SVIT_Diagram.png" alt="SVIT EKF Output" width="60%">
@@ -15,15 +17,20 @@ This EKF tracks 3D points ($3 \times 1$ Mean & $3 \times 3$ Covariance) observed
 Tracks are initialized as 3D **DLT Triangulation** between image feature point pairs.
 **Lukas-Kanade Optical Flow** tracks a point observation in Left Camera across time, and **Template-Matching** finds the corresponding point in Right Camera.
 
-- The Prediction Step propagates the Track-Distributions using IMU-based forward\lateral translation & yaw\pitch rotation velocities.
-- The Measurement Models are the standard 3x4 **Camera-Projection Matrices** $P_{Left}, P_{Right}$. 
-- The Measurement-Correction Step residual is the "Reprojection Error" (i.e. difference between observed and expected pixel coordinates) and uses a 2x3 **Jacobian** of the non-linear (i.e. non-homogenous normalized-by-Z) $P$. (see [README](VIT_EKF/README.md))
+- The Prediction Step propagates the Track-Distributions using IMU-based translational & rotational velocities.
+- The $4 \times 1$ measurement-vector $z$ vertically stacks both $2 \times 1$ $(row, col)$ pixels, $z_{left}$ and $z_{right}$. i.e. The observations in both cameras constitute a **single Measurement**, and are processed in a **single Correction Step**. 
+- The Measurement Model is the standard $3 \times 4$ **Camera-Projection Matrix** $\mathbf{P}$, followed by the _divide-by-z_ normalization of the Homogeneous Coordinate (Hartley, 2003). Hence, **the model is non-linear** $z = h(x)$. The $4 \times 3$ Measurement Jacobian $\mathbf{H}$ vertically stacks both $2 \times 3$ Measurement Jacobians $H_{left}$ and $H_{right}$. 
+- The $4 \times 1$ residual/innovation vector is the "Reprojection Error", $z - h(\hat{x})$ (i.e. difference between observed and predicted pixel coordinates).
+
+**Iterated**-EKF: Although the Correction Step repeats the Mean Update until either **(a)** the residual falls below a threshold ($2$ pixels), or **(b)** N iterations pass (hence, this is termed _Iterated_ EKF), ... the majority of tracks have post-correction residuals below $2$ pixels **after a single correction** (i.e. no Iterations required). 
+(see [README](VIT_EKF/README.md) for rigorous details.)
 
 <div align="center">
     <img src="./images/SVIT_OutputDisplay.png" alt="SVIT EKF Output" width="80%">
 </div>
 
 ## II. Object Detection/Classification + Tracking with PyTorch & ByteTrack
+`main_object_detection_track.py`
 
 [Full Video Recordings on YouTube](https://www.youtube.com/watch?v=-06SrHwsEzM&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=4)
 
@@ -40,6 +47,7 @@ Tracks are initialized as 3D **DLT Triangulation** between image feature point p
  
 
 ## III. DLT Triangulation of Point Pairs from KITTI Stereo Cameras
+`main_stereo_dlt_triangulation.py`
 
 Please watch: 
 [Full Video Recordings on YouTube](https://www.youtube.com/watch?v=w3AwZM1RpVQ&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=1)
@@ -72,6 +80,7 @@ Note how the triangulation resolution diminishes rapidly along the Line-of-Sight
 Point color represents Z-Axis depth. 
 
 ## IV. Optical Flow from KITTI Camera Sequance
+`main_optical_flow.py`
 
 [Full Video Recordings on YouTube](https://www.youtube.com/watch?v=mm-BLc3SGRY&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=7)
 
