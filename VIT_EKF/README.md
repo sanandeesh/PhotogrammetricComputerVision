@@ -1,6 +1,6 @@
 # Stereo Visual-Inertial Object Tracking with Iterated-EKF
 
-[Full Output Video Recordings on YouTube](https://www.youtube.com/watch?v=qI3MzEmzQrs&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=1)
+[Full Output Video Recordings on YouTube](https://www.youtube.com/watch?v=tfgrQTp6jsU&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=1)
 
 ## Summary 
 
@@ -38,7 +38,7 @@ Nonetheless, the Correction Step repeats the Mean (not Covariance) Update until 
 
 **Fig 3**: EKF Visualization Screenshot (see YT link for full videos)
 
-## I. Feature Detection, Initialization, & Tracking
+## 1. Feature Detection, Initialization, & Tracking
 Upon Track Initialization, features in Left Camera are detected via **Shi-Tomasi Corner Detection** provided by `cv2.goodFeaturesToTrack`.
 The optimal matching pixel coordinate is found in the Right Camera via `ski.feature.match_template()`. 
 The Each pixel coordinate pair is (with the calibrated Left & Right 3x4 camera matrices) triangulated via `cv2.triangulatePoints()`. 
@@ -74,7 +74,7 @@ Triangulation accuracy is highly **quantized** along the Z-axis with rapidly dec
     <img src="../images/z_quantization.png" alt="Depth Quantization" width="80%">
 </div>
 
-**Fig 2**: Quantization of Depth Resolution Degrades Rapidly along Line-of-Sight $z$*
+**Fig 4**: Quantization of Depth Resolution Degrades Rapidly along Line-of-Sight $z$*
 
 For the KITTI Camera, this variance as a function of depth $z$ is:
 
@@ -103,7 +103,7 @@ Below are initialized covariance matrices of each Track.
     <img src="../images/vitekf_cov_init.png" alt="Initialized Covariances" width="60%">
 </div>
 
-**Fig 3**: Initialized Track Covariances are rotated into the pixel Line-of-Sight
+**Fig 5**: Initialized Track Covariances are rotated into the pixel Line-of-Sight
 
 ### 2.2 Prediction Step
 The camera undergoes translation along $z$ (forward) and $x$ (lateral) axes, and undergoes rotation about $y$ (yaw) and $x$ (pitch) axes.
@@ -165,11 +165,11 @@ As expected, the Predicted Covariance matrix $\Sigma_\text{pred}$ _diffuses_ alo
     <img src="../images/vitekf_cov_pred.png" alt="Predicted Covariances" width="60%">
 </div>
 
-**Fig 4**: Predicted\Extrapolated Covariances injects noise due to motion variance in $\delta$ forward\right\yaw\pitch.
+**Fig 6**: Predicted\Extrapolated Covariances injects noise due to motion variance in $\delta$ forward\right\yaw\pitch.
 
 i.e. noise in camera yaw\pitch adds uncertainty horizontally\vertically and increasingly so as a function of point distance $z$ (_like a lever-arm_).
 
-## III. Camera Projection Model & Correction Step
+## 3. Measurement Space, Projection Model, & Correction Step
 Each camera observes $2 \times 1$ feature (origin is the upper left corner of the image):
 
 $$
@@ -252,11 +252,11 @@ As expected, the Measurement Corrected Covariance matrices $\Sigma_\text{correct
     <img src="../images/vitekf_cov_corrected.png" alt="Corrected Covariances" width="60%">
 </div>
 
-**Fig 5**: Measurement Corrected Covariances are "sharpened" along the pixel Line-of-Sight due to Projection-Jacobian $H$
+**Fig 7**: Measurement Corrected Covariances are "sharpened" along the pixel Line-of-Sight due to Projection-Jacobian $H$
 
 i.e. Cameras isolate objects in _angle_, but not in _range_.
 
-## IV. Results
+## 4. Results
 The VIT-EKF runs successfully.
 The performance of the VIT-EKF is evaluated according to the Pre and Post Measurement-Correction "Reprojection Error". i.e.
 
@@ -278,7 +278,7 @@ The Measurement-Correction consistently and significantly reduced these reprojec
     <img src="../images/vitekf_reproj_compare.png" alt="Reprojection Errors" width="100%">
 </div>
 
-**Fig 6**: Predicted Track Reprojection always exceed Corrected Track Reprojection. 
+**Fig 8**: Predicted Track Reprojection always exceed Corrected Track Reprojection. 
 
 Clearly, the Scenario B experiences more Prediction residual error, but nonetheless manages to reduce the errors to near zero in Post Correction residual error.
 
@@ -287,7 +287,7 @@ Clearly, the Scenario B experiences more Prediction residual error, but nonethel
 2D Features do not always "exit" the field-of-view neatly.
 The Feature-Tracking algorithm stubbornly re-assigns the track to nearby similar features rather than labeling it "gone". 
 
-## V. Conclusions, Open Points, & Follow-Up Steps
+## 5. Conclusions, Open Points, & Follow-Up Steps
 
 The main "discovery" of this project is the Jacobian of the camera projection model: 
 
