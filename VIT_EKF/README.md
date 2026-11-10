@@ -1,11 +1,10 @@
 # Stereo Visual-Inertial Object Tracking with Iterated-EKF
 
-Please Watch [Full Video Recordings on YouTube](https://www.youtube.com/watch?v=qI3MzEmzQrs&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=1)
+[Full Output Video Recordings on YouTube](https://www.youtube.com/watch?v=qI3MzEmzQrs&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=1)
 
 ## Summary 
 
-Given the KITTI stereo-camera dataset, **track the 3D position of points** in the **local frame of the Left Camera**. 
-The vehicle-sensor setup is shown below.
+This EKF tracks 3D points ($3 \times 1$ Mean & $3 \times 3$ Covariance) observed as 2D visual features in KITTI stereo camera dataset, in the local Left-Camera Frame.
 
 <div align="center">
     <img src="../images/VehicleSensorSetup.png" alt="Sensor Setup" width="55%">
@@ -13,7 +12,6 @@ The vehicle-sensor setup is shown below.
 
 **Fig 1**: KITTI Recording Platform *(Geiger et al, 2013)*
 
-This EKF tracks 3D points ($3 \times 1$ Mean & $3 \times 3$ Covariance) observed as 2D visual features in a stereo camera pair across video sequence (KITTI), in the Left-Camera Frame.
 
 <div align="center">
     <img src="../images/SVIT_Diagram.png" alt="SVIT EKF Output" width="60%">
@@ -29,7 +27,10 @@ Tracks are initialized as 3D **DLT Triangulation** between image feature point p
 - The Measurement Model is the standard $3 \times 4$ **Camera-Projection Matrix** $\mathbf{P}$, followed by the _divide-by-z_ normalization of the Homogeneous Coordinate (Hartley, 2003). Hence, **the model is non-linear** $z = h(x)$. The $4 \times 3$ Measurement Jacobian $\mathbf{H}$ vertically stacks both $2 \times 3$ Measurement Jacobians $H_{left}$ and $H_{right}$. 
 - The $4 \times 1$ residual/innovation vector is the "Reprojection Error", $z - h(\hat{x})$ (i.e. difference between observed and predicted pixel coordinates).
 
-**Iterated**-EKF: Although the Correction Step repeats the Mean Update until either **(a)** the residual falls below a threshold ($2$ pixels), or **(b)** N iterations pass, ... the majority of tracks achieve post-correction residuals below $2$ pixels **after a single correction** (i.e. no subsequent Iterations required). 
+**Iterated**-EKF: 
+The majority of tracks achieve post-correction residuals below $2$ pixels **after a single correction**.
+
+Nonetheless, the Correction Step repeats the Mean (not Covariance) Update until either **(a)** the residual falls below a threshold ($2$ pixels), or **(b)** N iterations pass.  
 
 <div align="center">
     <img src="../images/SVIT_OutputDisplay.png" alt="SVIT EKF Output" width="80%">
@@ -187,23 +188,25 @@ $$
 The standard $3 \times 4$ Camera projection $\mathbf{P}$ is applied to world point $\mathbf{x}$ as:
 
 $$
-PX = \begin{bmatrix} f_x & 0.0 & p_x & f_{x}b_{x} \\ 
-                     0.0 & f_y & p_y & 0.0        \\ 
-                     0.0 & 0.0 & 1.0 & 0.0 \end{bmatrix}   \begin{bmatrix} x \\ 
-                                                                           y \\ 
-                                                                           z \\ 
-                                                                           1.0 \end{bmatrix}
+\mathbf{Px} = \begin{bmatrix} f_x & 0.0 & p_x & f_{x}b_{x} \\ 
+                              0.0 & f_y & p_y & 0.0        \\ 
+                              0.0 & 0.0 & 1.0 & 0.0 \end{bmatrix}   \begin{bmatrix} x \\ 
+                                                                                    y \\ 
+                                                                                    z \\ 
+                                                                                     1.0 \end{bmatrix}
 $$
 
 where the baseline $b_x$ is $0.0$ for Left-Cam, and $0.54$ for Right-Cam.
 The homogeneous coordinate is normalized and removed by dividing the result by $z$.
 
 $$
-h(\mathbf{x}) = \begin{bmatrix} \frac{f_x}{Z} &           0.0 & \frac{c_x}{Z} & \frac{f_{x}b_{x}}{Z} \\ 
-                                         0.0  & \frac{f_y}{Z} & \frac{c_y}{Z} &       0.0        \end{bmatrix}  \begin{bmatrix} x \\ 
-                                                                                                                                y \\ 
-                                                                                                                                z \\ 
-                                                                                                                               1.0 \end{bmatrix}
+h(\mathbf{x}) = \frac{\mathbf{P}}{z}\mathbf{x} =
+                \begin{bmatrix} \frac{f_x}{z} &           0.0 & \frac{c_x}{z} & \frac{f_{x}b_{x}}{z} \\ 
+                                         0.0  & \frac{f_y}{z} & \frac{c_y}{z} &       0.0        \end{bmatrix}  
+                \begin{bmatrix} x \\
+                                y \\
+                                z \\
+                                1.0 \end{bmatrix}
 $$
 
 $$
@@ -218,7 +221,7 @@ $$
                                                   0.0 & \frac{f_y}{Z} & -\frac{f_y \cdot Y}{Z^2}                           \end{bmatrix}}
 $$
 
-The $3 \times 4$ Measurement Jacobian is:
+The $4 \times 3$ Measurement Jacobian is:
 
 $$
     \boxed{\mathbf{H} = \begin{bmatrix} \mathbf{H}_{Left} \\ 
@@ -257,19 +260,19 @@ i.e. Cameras isolate objects in _angle_, but not in _range_.
 The VIT-EKF runs successfully.
 The performance of the VIT-EKF is evaluated according to the Pre and Post Measurement-Correction "Reprojection Error". i.e.
 
-$\epsilon_\text{predicted} = f_i - P_\text{Left}\mu_\text{predicted}$
+$\epsilon_\text{predicted} = z - h(\mu_\text{predicted})$
 
-$\epsilon_\text{corrected} = f_i - P_\text{Left}\mu_\text{corrected}$
+$\epsilon_\text{corrected} = z - h(\mu_\text{corrected})$
 
 The **Innovation** or **Pre-Fit Residual** $\epsilon_\text{pred}$ *drives* the predicted state towards the measurement corrected state via the **Kalman Gain**
 
 The reprojection of 3D points which undergo IMU-based Prediction Model "track" their 2D features with remarkable accuracy. 
-However, due to triangulation, and IMU errors, predicted points do carry and accrue significant reprojection errors.
+However, due to triangulation, and IMU errors, predicted points rapidly accrue significant reprojection/residual errors.
 
 The Measurement-Correction consistently and significantly reduced these reprojection errors most often to zero pixels, but not always. e.g.
  
-- In City_0001, the camera follows a straight line with simple and distant 3D features. 
-- In City0005, the camera rotates often with complex nearby 3D features.
+- Scenario A: the camera follows a straight line with simple and distant 3D features. 
+- Scenario B: the camera rotates often with complex nearby 3D features.
 
 <div align="center">
     <img src="../images/vitekf_reproj_compare.png" alt="Reprojection Errors" width="100%">
@@ -277,28 +280,28 @@ The Measurement-Correction consistently and significantly reduced these reprojec
 
 **Fig 6**: Predicted Track Reprojection always exceed Corrected Track Reprojection. 
 
-Clearly, City_0005 experiences more reprojection error (particularly Pre-Fit), but does manage to reduce errors to near zero in Post-Fit.
+Clearly, the Scenario B experiences more Prediction residual error, but nonetheless manages to reduce the errors to near zero in Post Correction residual error.
 
 **Main Issue Observed**
 
 2D Features do not always "exit" the field-of-view neatly.
-The Feature-Tracking algorithm stubbornly re-assigns the track to nearby similar features rather than labelling it "gone". 
+The Feature-Tracking algorithm stubbornly re-assigns the track to nearby similar features rather than labeling it "gone". 
 
 ## V. Conclusions, Open Points, & Follow-Up Steps
 
-The main "contribution\discovery" of this mini-project is the Jacobian of the (normalized non-homogenous) camera projection model: 
+The main "discovery" of this project is the Jacobian of the camera projection model: 
 
 $$
-    \boxed{H = \begin{bmatrix} \frac{f_x}{Z} & 0.0 & -\frac{f_x \cdot X}{Z^2} \\ 
-                               0.0 & \frac{f_y}{Z} & -\frac{f_y \cdot Y}{Z^2} \end{bmatrix}}
+    \boxed{\mathbf{H} = \begin{bmatrix} \frac{f_x}{Z} & 0.0 & -\frac{f_x \cdot X}{Z^2} -\frac{f_{x}b_{x}}{Z^2} \\ 
+                                                  0.0 & \frac{f_y}{Z} & -\frac{f_y \cdot Y}{Z^2}                           \end{bmatrix}}
 $$
 
 This Jacobian enables any Kalman Filter to incorporate visual features into it's Measurement-Correction step.
+Furthermore, performing the Measurement Correction with both Left & Right measurements simultaneously exploits the cross-covariance between them (the $4 \times 4$ denominator of Kalman Gain).
 
 The Prediction-Model assumes _stationary objects_ seen from a moving camera.
 Nonetheless, the `VIT-EKF` successfully _tracks moving objects_ due to the measurement correction (even though the Predicted (Pre-Fit) Residual would be large).
-This Pre\Post-Fit Residual difference can be exploited to _identify moving objects_.
 
-Two natural extensions of this effort are to 
-- **Full Monocular** Initialize the track distances arbitrarily e.g. 50m, and see if they can converge to their true positions over numerous timesteps.
-- **Full Stereo** Track the features in the right image as well, and include **both Left & Right reprojection errors** into the Measurement-Correction steps. How to include correlation between these two observations?
+Hence, a possible follow up feature would be to _identify moving objects_ by comparing Pre\Post-Fit Residual differences across tracks.
+
+**$Q$, $R$, & $\Sigma_{init}$ Tuning:** This project made pure guesses, and rough approximations for the Process noise $Q$, Measurement noise $R$, and initial Track covariance $\Sigma_{init}$. A more rigorous process should be applied here.
