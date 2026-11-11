@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import skimage as ski # Template Matching
 from types import SimpleNamespace
 
+# ---------------------------------------------------------------------------------------------------------------------------------------
 # Calibrated Camera Matrixes (Stereo Pair, 0.54m apart), from 2011_09_26 recording
 P_Left = np.array([[7.215377e+02, 0.000000e+00, 6.095593e+02, 0.000000e+00],
                    [0.000000e+00, 7.215377e+02, 1.728540e+02, 0.000000e+00],
@@ -18,15 +19,28 @@ P_Right = np.array([[7.215377e+02, 0.000000e+00, 6.095593e+02, -3.875744e+02],
                     [0.000000e+00, 7.215377e+02, 1.728540e+02, 0.000000e+00],
                     [0.000000e+00, 0.000000e+00, 1.000000e+00, 0.000000e+00]])
 
+kMaxCorners = 100
+
 # params for Shi-Tomasi corner detection
-feature_params = dict( maxCorners = 200,
+feature_params = dict( maxCorners = kMaxCorners,
                        qualityLevel = 0.3,
-                       minDistance = 7,
+                       minDistance = 20,
                        blockSize = 7 )
 # Parameters for lucas kanade optical flow
-lk_params = dict( winSize  = (15,15),
-                  maxLevel = 2,
+lk_params = dict( winSize  = (45,45),
+                  maxLevel = 3,
                   criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
+
+# Measurement Covariance Matrix
+R = 5*np.eye(2) # Measurement Covariance (2,2) for Mono Cam
+R_stereo = 5*np.eye(4) # Measurement Covariance (4,4) for Stereo Cam
+
+kStereoMatchWindowSize = 51
+kHomogenousThreshold   = 0.001 # Triangulated Points must have Homogenous Coordinates greater than this (i.e. to avoid points too close to infinity)
+kNumCorrectionCycles   = 20
+kResidualThreshold     = 2 # Pixels
+kCounter               = 0 # For changing ROI in image for new Tracks
+# ---------------------------------------------------------------------------------------------------------------------------------------
 
 def GetImagePair(data_path, index):
     """Get KITTI Left\Right GreyScale Image Pair
@@ -56,40 +70,86 @@ def GetImagePair(data_path, index):
 
     return images
 
-kernel_half_length = 4 # Template-Matching Window Half-Size (Pixels)
-def ComputePointCorrespondences(left_image, right_image, left_poi):
-    """Compute corresponding pixels in right image, given features in left image.
-       
+def ComputePointCorrespondences(left_image, right_image, left_poi,
+                                kernel_size=15, max_offset=100, return_scores=False):
+    """Find, for each left-image point, its best match on the same row of the right image.
+
     Args:
-        left_image: 
-        right_image:
-        left_poi: points-of-interest in left image (2,N)  
+        left_image, right_image: 2D numpy arrays (rows x cols), grayscale, same shape.
+        left_poi: [2, N] array. Row 0 = x (column), row 1 = y (row) of each point.
+        kernel_size: side length (pixels) of the square template. Forced to be odd.
+        max_offset: the match is searched only in columns [x - max_offset, x] of
+            the right image (the right camera is shifted right, so points move left).
+        return_scores: if True, also return the N correlation scores (-1 .. 1).
 
     Returns:
-        Corresponding points on right image.
+        right_poi: [2, N] float array. right_poi[1] equals the (rounded and clipped)
+            left y; right_poi[0] is the matched column, with 0 <= right_x <= left_x.
+        scores (only if return_scores): [N] array of normalized cross-correlation
+            values at the chosen match (near 1 = confident, near 0 = ambiguous).
+
+    Edge handling: near an image border the template is clipped to the pixels that
+    exist (no invented padding on the template), so a point on the top, bottom or
+    right edge is matched with a smaller, off-centre window. The search range is
+    clipped to the image, so a point at column 5 is searched only in columns 0..5
+    (the right image is padded on its left side with its mean intensity so the
+    clipped template can still be slid to those positions). Every input point gets
+    a valid output point. Matches made from heavily clipped windows are less
+    reliable; check the score.
     """
-    [num_rows_img, num_cols_img] = left_image.shape
-    left_poi_rows = left_poi[1,:] # Y - Row
-    left_poi_cols = left_poi[0,:] # X - Col
-    num_points = left_poi.shape[1] # len(left_poi_rows)
-    right_poi_rows = np.zeros((num_points,))
-    right_poi_cols = np.zeros((num_points,))
-    k = kernel_half_length
-    for i in range(num_points):
-        right_poi_rows[i] = left_poi_rows[i]
-        kernel_rows = max(left_poi_rows[i] - k, 0), min(left_poi_rows[i] + k + 1, num_rows_img-1)
-        kernel_cols = max(left_poi_cols[i] - k, 0), min(left_poi_cols[i] + k + 1, num_cols_img-1)
-        kernel = left_image[kernel_rows[0]:kernel_rows[1], kernel_cols[0]:kernel_cols[1]]
-        start_col = max(left_poi_cols[i] - 100, 0) 
-        target_img_roi = right_image[kernel_rows[0]:kernel_rows[1], start_col:kernel_cols[1]]
-        # 
-        correlate_result = ski.feature.match_template(target_img_roi, kernel, pad_input=True)
-        right_poi_cols[i] = np.argmax(correlate_result[k,:]) + start_col
-    #
-    correspondence_pixels = np.vstack((right_poi_cols,  # X
-                                       right_poi_rows)) # Y
-    
-    return correspondence_pixels
+    left_image = np.asarray(left_image)
+    right_image = np.asarray(right_image)
+    if left_image.ndim != 2 or left_image.shape != right_image.shape:
+        raise ValueError("left_image and right_image must be 2D arrays of the same shape")
+    left_poi = np.asarray(left_poi, dtype=float)
+    if left_poi.ndim == 1:
+        left_poi = left_poi.reshape(2, 1)
+    if left_poi.ndim != 2 or left_poi.shape[0] != 2:
+        raise ValueError("left_poi must have shape [2, N]")
+
+    n_rows, n_cols = left_image.shape
+    k = int(kernel_size)
+    if k % 2 == 0:
+        k += 1                      # centred window needs an odd size
+    h = k // 2
+
+    left_f = left_image.astype(np.float32)
+    # Pad only the LEFT side of the right image, so a clipped template can be placed
+    # with its left edge at a negative column when the point is near the left border.
+    right_f = np.pad(right_image.astype(np.float32), ((0, 0), (h, 0)),
+                     mode="constant", constant_values=float(right_image.mean()))
+
+    xs = np.clip(np.rint(left_poi[0]), 0, n_cols - 1).astype(int)
+    ys = np.clip(np.rint(left_poi[1]), 0, n_rows - 1).astype(int)
+
+    right_poi = np.empty((2, xs.size), dtype=float)
+    scores = np.empty(xs.size, dtype=float)
+
+    for i, (x, y) in enumerate(zip(xs, ys)):
+        # Template: k x k patch around (x, y), clipped to the image bounds.
+        y0, y1 = max(0, y - h), min(n_rows, y + h + 1)
+        x0, x1 = max(0, x - h), min(n_cols, x + h + 1)
+        template = left_f[y0:y1, x0:x1]
+        ox = x - x0                                   # point's column inside the template
+        tw = x1 - x0
+
+        c_min = max(0, x - int(max_offset))           # leftmost allowed match column
+        # A match at column c puts the template's left edge at e = c - ox
+        # (padded-image column e + h). Candidates c = c_min .. x.
+        strip = right_f[y0:y1, (c_min - ox) + h:(x - ox) + h + tw]
+
+        ncc = ski.feature.match_template(strip, template)[0]      # length x - c_min + 1; index j <-> column c_min + j
+        ncc = np.nan_to_num(ncc, nan=-1.0)
+
+        # argmax over the reversed array so ties (e.g. textureless patches) resolve to
+        # the smallest offset (rightmost candidate) rather than the largest.
+        j = ncc.size - 1 - int(np.argmax(ncc[::-1]))
+
+        right_poi[0, i] = c_min + j
+        right_poi[1, i] = y
+        scores[i] = ncc[j]
+
+    return (right_poi, scores) if return_scores else right_poi
 
 def TriangulateFeaturesRemoveInvalidPoints(pts_2d_left, 
                                            pts_2d_right, 
@@ -114,21 +174,21 @@ def TriangulateFeaturesRemoveInvalidPoints(pts_2d_left,
     valid_mask = np.abs(w_coordinates) >= homog_coord_thresh
     # 5. Filter out invalid points from the homogeneous array
     filtered_homo = points_4d_homo[:, valid_mask]
-    # 6. Convert remaining valid points to 3D Euclidean space (shape: 3 x M)
-    points_3d = filtered_homo / filtered_homo[3, :]
     pts_2d_left  = pts_2d_left[:,valid_mask]
     pts_2d_right = pts_2d_right[:,valid_mask]
-    # 
-    # Flip Points behind Camera
+    # 6. Convert remaining valid points to 3D Euclidean space (shape: 3 x M)
+    points_3d = filtered_homo / filtered_homo[3, :]
+    assert np.all(points_3d[-1,:] == 1.0) # Is Homogenized
+    points_3d = points_3d[:-1,:] # Remove Homogenous Coordinate
+    # Ensure no points are behind the Camera
     i_negative_points = points_3d[2,:] < 0
-    #print(points_3d[2:,i_negative_points])
-    points_3d[:-1,i_negative_points] = -1*points_3d[:-1,i_negative_points]
+    assert (i_negative_points.sum() == 0)
 
-    assert ((points_3d.shape[0] == 4) and 
+    assert ((points_3d.shape[0] == 3) and 
             (points_3d.shape[1] == pts_2d_left.shape[1]) and 
             (pts_2d_left.shape == pts_2d_right.shape))
 
-    return points_3d, pts_2d_left
+    return points_3d, pts_2d_left, pts_2d_right
 
 def GetFeatureROIMask(image):
     """Binary Mask defines search region for Features.
@@ -144,6 +204,43 @@ def GetFeatureROIMask(image):
 
     return feature_roi_mask
 
+def GetFeatureROIMask_Dynamic(image, image_points):
+    """Binary Mask defines search region for Features.
+       
+    Args:
+        image: defines shape of ROI-Mask
+
+    Returns:
+        Binary Mask
+    """
+    global kCounter
+    num_rows, num_cols = image.shape
+    feature_roi_mask = np.zeros_like(image)
+    num_sections = 4
+    kStartColumn = 310 #100
+    kEndColumn = 932 # num_cols-1
+    values = np.linspace(kStartColumn, kEndColumn, num=(num_sections+1)).astype(int)
+    i_sector = kCounter % num_sections
+    feature_roi_mask[7:180,values[i_sector]:values[i_sector+1]] = 1
+    # Zero-out the Mast at pre-existing tracks
+    img_pt_cols = (image_points[0,:]>values[i_sector]) & (image_points[0,:]<values[i_sector+1])
+    image_points = image_points[:,img_pt_cols].astype(int)
+    radius = 10
+    for i_point in range(image_points.shape[1]):
+        col = image_points[0, i_point]
+        row = image_points[1, i_point]
+        # Calculate boundary limits safely clipped to image dimensions
+        r_min = max(0, row - radius)
+        r_max = min(num_rows, row + radius + 1)
+        c_min = max(0, col - radius)
+        c_max = min(num_cols, col + radius + 1)    
+        # Zero out the bounding box area
+        feature_roi_mask[r_min:r_max, c_min:c_max] = 0
+    #
+    kCounter += 1
+    print('kCounter ', kCounter, ' end_col, ', values[i_sector+1])
+    return feature_roi_mask
+
 def ProjectPoints(points_3d, P_Cam):
     """Project Points from Homogenous-3D to Homogenous-2D
        
@@ -154,9 +251,14 @@ def ProjectPoints(points_3d, P_Cam):
     Returns:
         Homogenous 2D Points [3xN] ready for plotting.
     """
+    assert (points_3d.shape[0] == 3) and (points_3d.ndim == 2) # and np.all(points_3d[-1,:] == 1.0) # No Longer
+    homogenous_coordinates = np.ones((1, points_3d.shape[1]))
+    points_3d = np.vstack((points_3d, homogenous_coordinates))
+    ##
     points_2d = P_Cam @ points_3d
     points_2d = points_2d / points_2d[-1,:] # Normalize by dividing by Homogenous Coordinate
-    #print('Projected points_2d.shape ', points_2d.shape)
+    assert np.all(points_2d[-1,:] == 1.0)
+    points_2d = points_2d[:-1,:]
 
     return points_2d
 
@@ -171,7 +273,9 @@ def AssertTracksShape(tracks):
     """    
     num_points = tracks.pts_2d_left.shape[1]
     assert (tracks.pts_2d_left.shape[0] == 2)
-    assert (tracks.pts_3d_mean.shape == (4, num_points))
+    assert (tracks.pts_2d_right.shape == (2, num_points))
+    assert (tracks.pts_3d_mean.shape == (3, num_points))
+    # assert np.all(tracks.pts_3d_mean[-1,:] == 1.0) # No Longer Stores Homogenous Coordinate
     assert (tracks.pts_3d_cov.shape  == (num_points, 3, 3))
     
     return num_points
@@ -187,16 +291,16 @@ def GetOdometryErrorParameters():
     """
     err_params = SimpleNamespace()
     # Translational error from translational speed
-    err_params.alpha1 = 0.05 # 0.05 to 0.1 (Unitless) Represents a 5% to 10% error in distance traveled.
+    err_params.alpha1 = 0.1 # 0.05 to 0.1 (Unitless) Represents a 5% to 10% error in distance traveled.
     # Translational error from rotational speed 
     # Models how much turning the wheels on a spot accidentally causes the robot to shift linearly.
-    err_params.alpha2 = 0.001 # 0.001 to 0.01 (m ⋅ s / rad). 
+    err_params.alpha2 = 0.01 # 0.001 to 0.01 (m ⋅ s / rad). 
     # Rotational error from translational speed: 
     # Models how much driving forward causes the robot to veer off course due to uneven wheel diameters or floor surfaces.
-    err_params.alpha3 = 0.05 # 0.05 to 0.2 (rad / m)
+    err_params.alpha3 = 0.2 # 0.05 to 0.2 (rad / m)
     # Rotational error from rotational speed: 
     # Represents a 5% to 10% error in the execution of a pure turn.
-    err_params.alpha4 = 0.05 # 0.05 to 0.1 (Unitless) 
+    err_params.alpha4 = 0.1 # 0.05 to 0.1 (Unitless) 
 
     return err_params
 
@@ -222,13 +326,13 @@ def ComputeOdometryCovariance(vf,
     err = GetOdometryErrorParameters()
     Q_input_space = np.eye(4)
     # Variance in Lateral Displacement (X)
-    Q_input_space[0,0] = (err.alpha1*(vr**2) + err.alpha2*(wu**2))*(delta_seconds**2) 
+    Q_input_space[0,0] = 0.5 # (err.alpha1*(vr**2) + err.alpha2*(wu**2))*(delta_seconds**2) 
     # Variance in Longitudinal Displacement (Z)
-    Q_input_space[1,1] = (err.alpha1*(vf**2) + err.alpha2*(wu**2))*(delta_seconds**2) 
+    Q_input_space[1,1] = 0.5 # (err.alpha1*(vf**2) + err.alpha2*(wu**2))*(delta_seconds**2) 
     # Variance in Yaw Displacement (theta)
-    Q_input_space[2,2] = (err.alpha3*(vf**2) + err.alpha4*(wu**2))*(delta_seconds**2)  
+    Q_input_space[2,2] = 0.1 # (err.alpha3*(vf**2) + err.alpha4*(wu**2))*(delta_seconds**2)  
     # Variance in Pitch Displacement (theta)
-    Q_input_space[3,3] = (err.alpha3*(vf**2) + err.alpha4*(wl**2))*(delta_seconds**2)  
+    Q_input_space[3,3] = 0.05 # (err.alpha3*(vf**2) + err.alpha4*(wl**2))*(delta_seconds**2)  
 
     return Q_input_space
 
@@ -281,7 +385,8 @@ def ComputeProcessNoise(Q_input_space,
     return Q_state_space
 
 def Assert3DMeanShape(pts_3d_mean):
-    assert pts_3d_mean.shape[0] == 4 # (x,y,z, 1.0)
+    assert pts_3d_mean.shape[0] == 3        # (x,y,z, 1.0)
+    #assert np.all(pts_3d_mean[-1,:] == 1.0) # Is Homogenized
     num_points = pts_3d_mean.shape[1]
 
     return num_points
