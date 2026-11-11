@@ -1,6 +1,6 @@
 # Stereo Visual-Inertial Object Tracking with Iterated-EKF
 
-[Full Output Video Recordings on YouTube](https://www.youtube.com/watch?v=tfgrQTp6jsU&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=1)
+[Full Output Video Recordings on YouTube](https://www.youtube.com/watch?v=qT3KrW8V1Mw&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=1)
 
 ## Summary 
 
@@ -217,8 +217,8 @@ $$
 The normalization makes $h(\mathbf{x})$ a **non-linear model**, and hence it must be linearized into a Jacobian for usage in the Measurement-Correction step.
 
 $$
-    \boxed{\mathbf{H} = \begin{bmatrix} \frac{f_x}{Z} & 0.0 & -\frac{f_x \cdot X}{Z^2} -\frac{f_{x}b_{x}}{Z^2} \\ 
-                                                  0.0 & \frac{f_y}{Z} & -\frac{f_y \cdot Y}{Z^2}                           \end{bmatrix}}
+    \boxed{\mathbf{H} = \begin{bmatrix} \frac{f_x}{z} &        0.0    & -\frac{f_x \cdot X}{z^2} -\frac{f_{x}b_{x}}{z^2} \\ 
+                                                  0.0 & \frac{f_y}{z} & -\frac{f_y \cdot Y}{z^2}                           \end{bmatrix}}
 $$
 
 The $4 \times 3$ Measurement Jacobian is:
@@ -292,16 +292,19 @@ The Feature-Tracking algorithm stubbornly re-assigns the track to nearby similar
 The main "discovery" of this project is the Jacobian of the camera projection model: 
 
 $$
-    \boxed{\mathbf{H} = \begin{bmatrix} \frac{f_x}{Z} & 0.0 & -\frac{f_x \cdot X}{Z^2} -\frac{f_{x}b_{x}}{Z^2} \\ 
-                                                  0.0 & \frac{f_y}{Z} & -\frac{f_y \cdot Y}{Z^2}                           \end{bmatrix}}
+    \boxed{\mathbf{H} = \begin{bmatrix} \frac{f_x}{z} &        0.0    & -\frac{f_x \cdot X}{z^2} -\frac{f_{x}b_{x}}{z^2} \\ 
+                                                  0.0 & \frac{f_y}{z} & -\frac{f_y \cdot Y}{z^2}                           \end{bmatrix}}
 $$
 
 This Jacobian enables any Kalman Filter to incorporate visual features into it's Measurement-Correction step.
 Furthermore, performing the Measurement Correction with both Left & Right measurements simultaneously exploits the cross-covariance between them (the $4 \times 4$ denominator of Kalman Gain).
 
 The Prediction-Model assumes _stationary objects_ seen from a moving camera.
-Nonetheless, the `VIT-EKF` successfully _tracks moving objects_ due to the measurement correction (even though the Predicted (Pre-Fit) Residual would be large).
+Nonetheless, the `VIT-EKF` successfully _tracks moving objects_ due to the Measurement Correction (even though the Predicted (Pre-Fit) Residual would be large).
 
-Hence, a possible follow up feature would be to _identify moving objects_ by comparing Pre\Post-Fit Residual differences across tracks.
+**Possible Follow Up Tasks:**
+- **Improve Feature Tracking Robustness**: Error behavior as high speed pixels leave the FoV causes most residuals.
+- **$Q$, $R$, & $\Sigma_{init}$ Tuning:** This project made pure guesses, and rough approximations for the Process noise $Q$, Measurement noise $R$, and initial Track covariance $\Sigma_{init}$. A more rigorous process should be applied here.
+- **Track 3D Bounding-Boxes around Road Users**: Combine the [2D Object Detection & Tracking](https://www.youtube.com/watch?v=-06SrHwsEzM&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=7) developed within this project with this 3D EKF Tracking to track bounding boxes around Vehicles/Pedestrians/etc.
 
-**$Q$, $R$, & $\Sigma_{init}$ Tuning:** This project made pure guesses, and rough approximations for the Process noise $Q$, Measurement noise $R$, and initial Track covariance $\Sigma_{init}$. A more rigorous process should be applied here.
+
