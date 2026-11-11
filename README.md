@@ -6,7 +6,7 @@ Applies classical & modern 3D Computer Vision concepts and techniques to the pre
 
 **Please read the** [VIT-EKF README](VIT_EKF/README.md) **for full description of the filter.**
 
-[Full Video Recordings on YouTube](https://www.youtube.com/watch?v=tfgrQTp6jsU&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=1)
+[Full Video Recordings on YouTube](https://www.youtube.com/watch?v=qT3KrW8V1Mw&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=1)
 
 This EKF tracks 3D points ($3 \times 1$ Mean & $3 \times 3$ Covariance) observed as 2D visual features in a stereo camera pair across video sequence (KITTI), in the Left-Camera Frame.
 
@@ -22,7 +22,9 @@ Tracks are initialized as 3D **DLT Triangulation** between image feature point p
 - The Measurement Model is the standard $3 \times 4$ **Camera-Projection Matrix** $\mathbf{P}$, followed by the _divide-by-z_ normalization of the Homogeneous Coordinate (Hartley, 2003). Hence, **the model is non-linear** $z = h(x)$. The $4 \times 3$ Measurement Jacobian $\mathbf{H}$ vertically stacks both $2 \times 3$ Measurement Jacobians $H_{left}$ and $H_{right}$. 
 - The $4 \times 1$ residual/innovation vector is the "Reprojection Error", $z - h(\hat{x})$ (i.e. difference between observed and predicted pixel coordinates).
 
-**Iterated**-EKF: Although the Correction Step repeats the Mean Update until either **(a)** the residual falls below a threshold ($2$ pixels), or **(b)** N iterations pass, ... the majority of tracks achieve post-correction residuals below $2$ pixels **after a single correction** (i.e. no subsequent Iterations required). 
+**Iterated**-EKF: The majority of tracks achieve post-correction residuals below $2$ pixels **after a single correction**.
+Nonetheless, the Correction Step repeats the Mean Update until either **(a)** the residual falls below a threshold ($2$ pixels), or **(b)** N iterations pass. 
+
 (see [README](VIT_EKF/README.md) for rigorous details.)
 
 <div align="center">
