@@ -1,6 +1,6 @@
 # Stereo Visual-Inertial Object Tracking with Iterated-EKF
 
-[Full Output Video Recordings on YouTube](https://www.youtube.com/watch?v=qT3KrW8V1Mw&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=1)
+[Full Output Video Recordings on YouTube](https://www.youtube.com/watch?v=Y4hlckr36Xs&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=2)
 
 ## Summary 
 
