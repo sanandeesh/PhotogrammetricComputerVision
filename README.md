@@ -4,9 +4,13 @@ Applies classical & modern 3D Computer Vision to the preeminent **KITTI** stereo
 ## I. Stereo Visual-Inertial Object Tracking with Iterated-EKF
 `main_visual_inertial_tracking_EKF.py`
 
-**Please read the** [VIT-EKF README](VIT_EKF/) **for full description of the filter.**
+**Read the** [VIT-EKF README](VIT_EKF/) **for full description of the filter.**
 
 [Full Video Recordings on YouTube](https://www.youtube.com/watch?v=Y4hlckr36Xs&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=1)
+
+<div align="center">
+    <img src="./images/SVIT_OutputDisplay.png" alt="SVIT EKF Output" width="95%">
+</div>
 
 This EKF tracks 3D points ($3 \times 1$ Mean & $3 \times 3$ Covariance) observed as 2D visual features in a stereo camera pair across video sequence (KITTI), in the Left-Camera Frame.
 
@@ -25,11 +29,7 @@ Tracks are initialized as 3D **DLT Triangulation** between image feature point p
 **Iterated**-EKF: The majority of tracks achieve post-correction residuals below $2$ pixels **after a single correction**.
 Nonetheless, the Correction Step repeats the Mean Update until either **(a)** the residual falls below a threshold ($2$ pixels), or **(b)** N iterations pass. 
 
-(see [README](VIT_EKF/README.md) for rigorous details.)
-
-<div align="center">
-    <img src="./images/SVIT_OutputDisplay.png" alt="SVIT EKF Output" width="80%">
-</div>
+(see [README](VIT_EKF/) for rigorous details.)
 
 ## II. Object Detection/Classification + Tracking with PyTorch & ByteTrack
 `main_object_detection_track.py`
