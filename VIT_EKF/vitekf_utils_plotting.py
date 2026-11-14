@@ -9,58 +9,71 @@ import matplotlib.pyplot as plt
 import SVIT_EKF.vitekf_utils_core as utils
 from types import SimpleNamespace
 from scipy.stats import multivariate_normal
-
+from matplotlib.patches import Ellipse
+from scipy.stats import chi2
+ 
+kZMax = 150.0
 #                            X       Z
-image_extent_vertical = [-40, 40,  0, 150] # m
-#                            Z       Y 
-image_extent_lateral  = [  0, 150,  5, -30]  # m
+image_extent_vertical = [-40, 40,  0, kZMax] # m
+#                             Z         Y 
+image_extent_lateral  = [  0, kZMax,  5, -30]  # m
 # 
-track_scttr_size = 140
+kTrackScttrSize = 140
 kDistributionVMax = 0.03
-def ComputeGaussianCrossSectionalViews(tracks):
-    """Compute Gaussian Cross Sectional Views
-    Args:
-        tracks: 
-    Returns:
-        gaussian_xsection Struct with Lateral & Vertical Images
-    """
-    num_points = utils.AssertTracksShape(tracks)
-    image_size = 400  # pixels
-    # Vertical View
-    x = np.linspace(image_extent_vertical[0], image_extent_vertical[1], image_size)
-    y = np.linspace(image_extent_vertical[2], image_extent_vertical[3], image_size)
-    X, Y = np.meshgrid(x, y)
-    pos_vert = np.dstack((X, Y))  # Stack grid arrays for multivariate normal evaluation
-    # Lateral View
-    x = np.linspace(image_extent_lateral[0], image_extent_lateral[1], image_size)
-    y = np.linspace(image_extent_lateral[2], image_extent_lateral[3], image_size)
-    X, Y = np.meshgrid(x, y)
-    pos_lat = np.dstack((X, Y))  # Stack grid arrays for multivariate normal evaluation
-    # 
-    gaussian_xsection_vert = np.zeros((image_size, image_size))
-    gaussian_xsection_lat  = np.zeros((image_size, image_size))
-    for i_point in range(num_points):
-        # Create the multivariate Gaussian distribution
-        mean_xz = tracks.pts_3d_mean[(0,2),i_point]
-        cov = tracks.pts_3d_cov[i_point,:,:] 
-        cov_xz = cov[np.ix_([0,2],[0,2])]
-        gaussian = multivariate_normal(mean=mean_xz, 
-                                       cov=cov_xz, allow_singular=True)        
-        z = gaussian.pdf(pos_vert)
-        gaussian_xsection_vert += z
-        # 
-        mean_zy = tracks.pts_3d_mean[(2,1),i_point]
-        cov_zy = cov[np.ix_([2,1],[2,1])]
-        gaussian = multivariate_normal(mean=mean_zy, 
-                                       cov=cov_zy, allow_singular=True)        
-        z = gaussian.pdf(pos_lat)
-        gaussian_xsection_lat += z
-    # 
-    gaussian_xsection = SimpleNamespace()
-    gaussian_xsection.vert = gaussian_xsection_vert
-    gaussian_xsection.lat  = gaussian_xsection_lat
 
-    return gaussian_xsection
+kPredictedColor = (112/255, 128/255, 144/255, 0.05) 
+kCorrectedColor = (112/255, 128/255, 144/255, 1.0) 
+chi2_90 = chi2.ppf(0.90, df=2)
+kfps = 10 # Video Recording FPS
+
+
+def ComputeCovarianceEllipse(mean, cov, color):
+    eigvals, eigvecs = np.linalg.eigh(cov)
+    order = eigvals.argsort()[::-1]
+    eigvals, eigvecs = eigvals[order], eigvecs[:, order]
+    
+    angle = np.degrees(np.arctan2(*eigvecs[:, 0][::-1]))
+    width, height = 2 * np.sqrt(chi2_90 * eigvals)
+
+    ellipse = Ellipse(xy=mean, width=width, height=height, angle=angle, facecolor=color, 
+                      edgecolor='black', linewidth=0.5)
+
+    return ellipse
+
+def ComputeCovarianceEllipses(tracks, color = 'slategray'):
+    vertical_view = []
+    lateral_view  = []
+    num_points = utils.AssertTracksShape(tracks)
+    for i_point in range(num_points):
+        mean = tracks.pts_3d_mean[:,i_point]
+        if (mean[2] > kZMax):
+            continue
+        cov = tracks.pts_3d_cov[i_point,:,:]
+        # Vertical View
+        mean_xz = mean[(0,2),]
+        cov_xz = cov[np.ix_([0,2],[0,2])]
+        ellipse = ComputeCovarianceEllipse(mean_xz, cov_xz, color)
+        vertical_view.append(ellipse)
+        # Lateral View
+        mean_zy = mean[(2,1),]
+        cov_zy = cov[np.ix_([2,1],[2,1])]
+        ellipse = ComputeCovarianceEllipse(mean_zy, cov_zy, color)
+        lateral_view.append(ellipse)
+    #
+    covariance_ellipses = SimpleNamespace()
+    covariance_ellipses.vertical_view = vertical_view
+    covariance_ellipses.lateral_view  = lateral_view    
+   
+    return covariance_ellipses
+
+def AddCovarianceEllipses(axis, covariance_ellipses):
+    for patch in list(axis.patches):
+        patch.remove()
+
+    for ellipse in covariance_ellipses:
+        axis.add_patch(ellipse)
+
+    return
 
 def InitializeVisualization(images, tracks):
     """Initialize Visualization
@@ -71,7 +84,8 @@ def InitializeVisualization(images, tracks):
         plot_handles:
     """
     num_points = utils.AssertTracksShape(tracks)
-    gaussian_xsection = ComputeGaussianCrossSectionalViews(tracks)
+    covariance_ellipses_pred = ComputeCovarianceEllipses(tracks, kPredictedColor)
+    covariance_ellipses_corr = ComputeCovarianceEllipses(tracks, kPredictedColor)
     # Init Visualization
     layout = [
         ['left1', 'left1', 'middle1', 'right1'],
@@ -94,14 +108,14 @@ def InitializeVisualization(images, tracks):
                                             color='cyan', s=80, label='Observation')
     reproj_left  = utils.ProjectPoints(tracks.pts_3d_mean, utils.P_Left)
     reproj_left_scatter = axd['left1'].scatter(reproj_left[0,:], 
-                                                   reproj_left[1,:], 
-                                                   edgecolors='lime', facecolors='none', linewidths=3.5, s=80, 
-                                                   label='Corr Reproj')
+                                               reproj_left[1,:], 
+                                               edgecolors='lime', facecolors='none', linewidths=3.5, s=80, 
+                                               label='Corrrected Reproj')
     reproj_prefit_left_scatter = axd['left1'].scatter(reproj_left[0,:], 
-                                                 reproj_left[1,:], 
-                                                 edgecolors='red', facecolors='none', linewidths=2.0, s=80, 
-                                                 label='Pred Reproj')
-    axd['left1'].legend(loc='upper right', fontsize=16)    
+                                                      reproj_left[1,:], 
+                                                      edgecolors='red', facecolors='none', linewidths=2.0, s=80, 
+                                                      label='Predicted Reproj')
+    axd['left1'].legend(loc='lower right', fontsize=16)    
     axd['left1'].set_title('Left Camera', 
                            fontsize=title_font_size, weight='bold')    
     axd['left1'].set_xticks([])
@@ -121,7 +135,6 @@ def InitializeVisualization(images, tracks):
                                                        reproj_right[1,:], 
                                                        edgecolors='red', facecolors='none', linewidths=2.0, s=80, 
                                                        label='Pred Reproj')
-    #axd['left2'].legend(loc='upper right', fontsize=16)    
     axd['left2'].set_title('Right Camera', fontsize=title_font_size, weight='bold')    
     axd['left2'].set_xticks([])
     axd['left2'].set_yticks([])
@@ -137,71 +150,85 @@ def InitializeVisualization(images, tracks):
     pre_fit_res_right_plot,   = axd['left3'].plot(np.arange(num_points), post_fit_res, 
                                                   color='red',  label='Predicted Right', linewidth=3.0, linestyle='dashed')    
     axd['left3'].set_title('Residuals: Reprojection Errors', fontsize=title_font_size, weight='bold')
-    axd['left3'].set_xlabel('Track Index', fontsize=label_font_size, weight='bold')
-    axd['left3'].set_ylabel('Distance (pixels)', fontsize=label_font_size, weight='bold')
-    axd['left3'].legend(loc='upper right', fontsize=18)  
+    axd['left3'].set_xlabel('Track Index',                   fontsize=label_font_size, weight='bold')
+    axd['left3'].set_ylabel('Distance (pixels)',             fontsize=label_font_size, weight='bold')
+    axd['left3'].legend(loc='upper right',                   fontsize=18)  
     axd['left3'].grid(True)
     axd['left3'].set_ylim(-2,15)
     # ----------------------------------------------------------------------------------------
     # Middle 1 PREDICT
+    AddCovarianceEllipses(axd['middle1'], covariance_ellipses_pred.vertical_view)
     vert_pred_scatter = axd['middle1'].scatter(tracks.pts_3d_mean[0,:], 
-                                                 tracks.pts_3d_mean[2,:], 
-                                                 facecolors='violet',   
-                                                 edgecolors='black',   
-                                                 linewidths=2.5,        
-                                                 s=track_scttr_size)
-    vert_pred_imshow  = axd['middle1'].imshow(gaussian_xsection.vert, 
-                                                cmap='magma', origin='lower', 
-                                                extent=image_extent_vertical, vmin=0, vmax=kDistributionVMax)
-    axd['middle1'].set_xlabel('X Lateral Axis (m)', fontsize=label_font_size, weight='bold')
-    axd['middle1'].set_ylabel('Vertical View', fontsize=title_font_size, weight='bold')
-    axd['middle1'].set_title('Predicted', fontsize=title_font_size+5, weight='bold')
-    axd['middle1'].grid(True, color='violet', linestyle='--', linewidth=0.5)
+                                               tracks.pts_3d_mean[2,:], 
+                                               facecolors='crimson',   
+                                               edgecolors='black',   
+                                               linewidths=2.5,        
+                                               s=kTrackScttrSize,
+                                               zorder=2)
+    axd['middle1'].set_xlim((image_extent_vertical[0], image_extent_vertical[1]))
+    axd['middle1'].set_ylim((image_extent_vertical[2], image_extent_vertical[3]))
+    axd['middle1'].set_xlabel('X Lateral Axis (m)', fontsize=label_font_size,   weight='bold')
+    axd['middle1'].set_ylabel('Vertical View',      fontsize=title_font_size,   weight='bold')
+    axd['middle1'].set_title('Predicted',           fontsize=title_font_size+5, weight='bold')
+    axd['middle1'].grid(True, color='violet',       linestyle='--', linewidth=0.5)
     axd['middle1'].set_aspect("equal")
     # Middle 2 PREDICT
+    AddCovarianceEllipses(axd['middle2'], covariance_ellipses_pred.lateral_view)
     lateral_pred_scatter = axd['middle2'].scatter(tracks.pts_3d_mean[2,:], 
-                                              tracks.pts_3d_mean[1,:], 
-                                              facecolors='violet',   
-                                              edgecolors='black',   
-                                              linewidths=2.5,        
-                                              s=track_scttr_size)                 
-    lateral_pred_imshow = axd['middle2'].imshow(gaussian_xsection.lat, 
-                                            cmap='magma', origin='lower', 
-                                            extent=image_extent_lateral, vmin=0, vmax=kDistributionVMax)
+                                                  tracks.pts_3d_mean[1,:], 
+                                                  facecolors='crimson',   
+                                                  edgecolors='black',   
+                                                  linewidths=2.5,        
+                                                  s=kTrackScttrSize,
+                                                  zorder=2)                 
+    axd['middle2'].set_xlim((image_extent_lateral[0], image_extent_lateral[1]))
     axd['middle2'].set_ylim((image_extent_lateral[2], image_extent_lateral[3]))
     axd['middle2'].set_xlabel('Z Longitudinal Axis (m)', fontsize=label_font_size, weight='bold')
     axd['middle2'].set_ylabel('Side View', fontsize=title_font_size, weight='bold')
     axd['middle2'].grid(True, color='violet', linestyle='--', linewidth=0.5)
+    axd['middle2'].set_aspect("equal")
     # ----------------------------------------------------------------------------------------
     # Right 1 CORRECT
+    AddCovarianceEllipses(axd['right1'], covariance_ellipses_corr.vertical_view)
     vert_corr_scatter = axd['right1'].scatter(tracks.pts_3d_mean[0,:], 
                                               tracks.pts_3d_mean[2,:], 
-                                              facecolors='violet',   
+                                              facecolors='lime',   
                                               edgecolors='black',   
                                               linewidths=2.5,        
-                                              s=track_scttr_size)
-    vert_corr_imshow  = axd['right1'].imshow(gaussian_xsection.vert, 
-                                             cmap='magma', origin='lower', 
-                                             extent=image_extent_vertical, vmin=0, vmax=kDistributionVMax)
+                                              s=kTrackScttrSize,
+                                              zorder=2)
+    axd['right1'].set_xlim((image_extent_vertical[0], image_extent_vertical[1]))
+    axd['right1'].set_ylim((image_extent_vertical[2], image_extent_vertical[3]))
     axd['right1'].set_xlabel('X Lateral Axis (m)', fontsize=label_font_size, weight='bold')
     axd['right1'].set_ylabel('Z Longitudinal Axis (m)', fontsize=label_font_size, weight='bold')
     axd['right1'].set_title('Corrected', fontsize=title_font_size+5, weight='bold')
     axd['right1'].grid(True, color='violet', linestyle='--', linewidth=0.5)
     axd['right1'].set_aspect("equal")
     # Right 2 CORRECT
+    AddCovarianceEllipses(axd['right2'], covariance_ellipses_corr.lateral_view)
     lateral_corr_scatter = axd['right2'].scatter(tracks.pts_3d_mean[2,:], 
                                                  tracks.pts_3d_mean[1,:], 
-                                                 facecolors='violet',   
+                                                 facecolors='lime',   
                                                  edgecolors='black',   
                                                  linewidths=2.5,        
-                                                 s=track_scttr_size)                 
-    lateral_corr_imshow = axd['right2'].imshow(gaussian_xsection.lat, 
-                                               cmap='magma', origin='lower', 
-                                               extent=image_extent_lateral, vmin=0, vmax=kDistributionVMax)
+                                                 s=kTrackScttrSize,
+                                                 zorder=2)                 
+    axd['right2'].set_xlim((image_extent_lateral[0], image_extent_lateral[1]))
     axd['right2'].set_ylim((image_extent_lateral[2], image_extent_lateral[3]))
     axd['right2'].set_xlabel('Z Longitudinal Axis (m)', fontsize=label_font_size, weight='bold')
     axd['right2'].set_ylabel('Y Vertical Axis (m)', fontsize=label_font_size, weight='bold')
     axd['right2'].grid(True, color='violet', linestyle='--', linewidth=0.5)
+    axd['right2'].set_aspect("equal")
+    #
+    fig.text(
+        0.98, 0.03,                                                    # x=98% right, y=2% from bottom of figure
+        "90% Confidence Ellipses of Track Covariances",
+        ha='right',                                                    # Align right edge of text to x=0.98
+        va='bottom',                                                   # Align bottom edge of text to y=0.02
+        color='black',                                                 # High contrast for your black background
+        fontsize=40,
+        style='italic'                                                 # Optional subtle caption styling
+    )
     ## ===================================================================================
     plot_handles = SimpleNamespace()
     plot_handles.fig = fig
@@ -222,17 +249,13 @@ def InitializeVisualization(images, tracks):
     plot_handles.post_fit_res_right_plot  = post_fit_res_right_plot 
     plot_handles.pre_fit_res_right_plot   = pre_fit_res_right_plot    
     # Middle 1
-    plot_handles.vert_pred_scatter = vert_pred_scatter
-    plot_handles.vert_pred_imshow = vert_pred_imshow                      
+    plot_handles.vert_pred_scatter = vert_pred_scatter                    
     # Middle 2
     plot_handles.lateral_pred_scatter = lateral_pred_scatter
-    plot_handles.lateral_pred_imshow = lateral_pred_imshow
     # Right 1
-    plot_handles.vert_corr_scatter = vert_corr_scatter
-    plot_handles.vert_corr_imshow = vert_corr_imshow                      
+    plot_handles.vert_corr_scatter = vert_corr_scatter               
     # Right 2
     plot_handles.lateral_corr_scatter = lateral_corr_scatter
-    plot_handles.lateral_corr_imshow = lateral_corr_imshow
     
     return plot_handles
     
@@ -244,13 +267,13 @@ def UpdatePredictedXSectionViews(plot_handles,
         tracks: 
     Returns:
     """
-    gaussian_xsection = ComputeGaussianCrossSectionalViews(tracks)
-    # axd['middle2']
-    plot_handles.lateral_pred_scatter.set_offsets(np.vstack((tracks.pts_3d_mean[2,:], tracks.pts_3d_mean[1,:])).T)
-    plot_handles.lateral_pred_imshow.set_data(gaussian_xsection.lat) # Y-Axis Points Downward
+    covariance_ellipses = ComputeCovarianceEllipses(tracks, kPredictedColor)
     # axd['middle1']
+    AddCovarianceEllipses(plot_handles.axd['middle1'], covariance_ellipses.vertical_view)
     plot_handles.vert_pred_scatter.set_offsets(np.vstack((tracks.pts_3d_mean[0,:], tracks.pts_3d_mean[2,:])).T)
-    plot_handles.vert_pred_imshow.set_data(gaussian_xsection.vert)
+    # axd['middle2']
+    AddCovarianceEllipses(plot_handles.axd['middle2'], covariance_ellipses.lateral_view)
+    plot_handles.lateral_pred_scatter.set_offsets(np.vstack((tracks.pts_3d_mean[2,:], tracks.pts_3d_mean[1,:])).T)
 
     return
 
@@ -262,13 +285,13 @@ def UpdateCorrectedXSectionViews(plot_handles,
         tracks: 
     Returns:
     """
-    gaussian_xsection = ComputeGaussianCrossSectionalViews(tracks)
-    # axd['middle2']
-    plot_handles.lateral_corr_scatter.set_offsets(np.vstack((tracks.pts_3d_mean[2,:], tracks.pts_3d_mean[1,:])).T)
-    plot_handles.lateral_corr_imshow.set_data(gaussian_xsection.lat) # Y-Axis Points Downward
-    # axd['middle1']
+    covariance_ellipses = ComputeCovarianceEllipses(tracks, kCorrectedColor)
+    # axd['right1']
+    AddCovarianceEllipses(plot_handles.axd['right1'], covariance_ellipses.vertical_view)
     plot_handles.vert_corr_scatter.set_offsets(np.vstack((tracks.pts_3d_mean[0,:], tracks.pts_3d_mean[2,:])).T)
-    plot_handles.vert_corr_imshow.set_data(gaussian_xsection.vert)
+    # axd['right2']
+    AddCovarianceEllipses(plot_handles.axd['right2'], covariance_ellipses.lateral_view)
+    plot_handles.lateral_corr_scatter.set_offsets(np.vstack((tracks.pts_3d_mean[2,:], tracks.pts_3d_mean[1,:])).T)
 
     return
 
@@ -284,10 +307,7 @@ def UpdateImageAndReprojectionError(plot_handles,
     Returns:
     """
     num_points = utils.AssertTracksShape(tracks)
-    # print('reproj_pred.shape ', reproj_pred.shape)
-    # print('num_points ', num_points)
     assert pts_3d_mean_pred.shape == (3, num_points)
-    #assert np.all(pts_3d_mean_pred[-1,:] == 1.0) # Is Homogenized
     # Predicted Reprojections Left/Right
     reproj_left_pred   = utils.ProjectPoints(pts_3d_mean_pred, utils.P_Left)  # Only Left is used in KF
     reproj_right_pred  = utils.ProjectPoints(pts_3d_mean_pred, utils.P_Right) # Only Left is used in KF
@@ -327,7 +347,6 @@ def UpdateImageAndReprojectionError(plot_handles,
 
 def InitializeVideoWriter(fig, file_name):
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    fps = 10
     #width, height = fig.canvas.get_width_height()
     img_rgba = np.asarray(fig.canvas.buffer_rgba())
     img_bgr = cv2.cvtColor(img_rgba, cv2.COLOR_RGBA2BGR)
@@ -336,7 +355,7 @@ def InitializeVideoWriter(fig, file_name):
     true_height, true_width, _ = img_bgr.shape
     writer = cv2.VideoWriter(file_name, 
                              fourcc, 
-                             fps, 
+                             kfps, 
                              (true_width, true_height)) 
     
     return writer
@@ -348,3 +367,4 @@ def WriteToVideo(writer, fig):
     # Write the frame to the video file
     writer.write(img_bgr)
     return
+
