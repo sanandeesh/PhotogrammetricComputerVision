@@ -4,9 +4,9 @@ Applies classical & modern 3D Computer Vision concepts and techniques to the pre
 ## I. Stereo Visual-Inertial Object Tracking with Iterated-EKF
 `main_visual_inertial_tracking_EKF.py`
 
-**Please read the** [VIT-EKF README](VIT_EKF/README.md) **for full description of the filter.**
+**Please read the** [VIT-EKF README](VIT_EKF/) **for full description of the filter.**
 
-[Full Video Recordings on YouTube](https://www.youtube.com/watch?v=qT3KrW8V1Mw&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=1)
+[Full Video Recordings on YouTube](https://www.youtube.com/watch?v=Y4hlckr36Xs&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=1)
 
 This EKF tracks 3D points ($3 \times 1$ Mean & $3 \times 3$ Covariance) observed as 2D visual features in a stereo camera pair across video sequence (KITTI), in the Left-Camera Frame.
 
