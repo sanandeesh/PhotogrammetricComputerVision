@@ -1,5 +1,5 @@
 # ComputerVision Deep Dive
-Applies classical & modern 3D Computer Vision concepts and techniques to the preeminent **KITTI** stereo camera dataset (Geiger, 2013).
+Applies classical & modern 3D Computer Vision to the preeminent **KITTI** stereo camera dataset (Geiger, 2013).
 
 ## I. Stereo Visual-Inertial Object Tracking with Iterated-EKF
 `main_visual_inertial_tracking_EKF.py`
