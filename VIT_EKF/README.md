@@ -152,12 +152,24 @@ $$
 and $J_Q$ is the Jacobian of the State-Transition-Model with respect to the Control Parameters
 
 $$
-J = \begin{bmatrix} -1.0 & 0 & -1.0 \cdot \delta_z + 1.0 \cdot \mu_z & 0 \\ 
-                                            0 & 0 & 0 & \delta_z - \mu_z \\ 
-                                            0 & -1 & \delta_x - \mu_x & 1.0 \cdot \mu_y \end{bmatrix}
+\mathbf{J} = \begin{bmatrix} j_{0,0} & j_{0,1} & j_{0,2} & j_{0,3} \\ 
+                             j_{1,0} & j_{1,1} & j_{1,2} & j_{1,3} \\ 
+                             j_{2,0} & j_{2,1} & j_{2,2} & j_{2,3} \end{bmatrix}
 $$
 
-(assuming $\delta_\text{yaw} = \delta_\text{pitch} = 0.0$ for simplicity)
+<div align="center">
+    <img src="../images/SVIT_JacobianProcessNoise.png" alt="Q Jacobian Full" width="100%">
+</div>
+
+Assuming $\delta_\text{yaw} = \delta_\text{pitch} = 0.0$ simplifies this to:
+
+$$
+\mathbf{J} = \begin{bmatrix} -1.0 & 0  & \delta_z + \mu_z & 0 \\ 
+                                0 & 0  & 0 & \delta_z - \mu_z \\ 
+                                0 & -1 & \delta_x - \mu_x & \mu_y \end{bmatrix}
+$$
+
+Both Jacobians yield nearly identical results, in general.
 
 As expected, the Predicted Covariance matrix $\Sigma_\text{pred}$ _diffuses_ along the camera yaw\pitch angles. 
 
