@@ -2,6 +2,8 @@
 
 [Full Output Video Recordings on YouTube](https://www.youtube.com/watch?v=Y4hlckr36Xs&list=PL9IYlUueNFoa8mLsTHtWhH6aflSdcyqWZ&index=2)
 
+**Entry Point:** [main_visual_inertial_tracking_EKF.py](../main_visual_inertial_tracking_EKF.py)
+
 ## Summary 
 
 This EKF tracks 3D points ($3 \times 1$ Mean & $3 \times 3$ Covariance) observed as 2D visual features in KITTI stereo camera dataset, in the local Left-Camera Frame.
