@@ -160,7 +160,7 @@ def InitializeVisualization(images, tracks):
     AddCovarianceEllipses(axd['middle1'], covariance_ellipses_pred.vertical_view)
     vert_pred_scatter = axd['middle1'].scatter(tracks.pts_3d_mean[0,:], 
                                                tracks.pts_3d_mean[2,:], 
-                                               facecolors='crimson',   
+                                               facecolors='red',   
                                                edgecolors='black',   
                                                linewidths=2.5,        
                                                s=kTrackScttrSize,
@@ -176,7 +176,7 @@ def InitializeVisualization(images, tracks):
     AddCovarianceEllipses(axd['middle2'], covariance_ellipses_pred.lateral_view)
     lateral_pred_scatter = axd['middle2'].scatter(tracks.pts_3d_mean[2,:], 
                                                   tracks.pts_3d_mean[1,:], 
-                                                  facecolors='crimson',   
+                                                  facecolors='red',   
                                                   edgecolors='black',   
                                                   linewidths=2.5,        
                                                   s=kTrackScttrSize,
