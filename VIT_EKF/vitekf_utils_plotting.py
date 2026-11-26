@@ -6,7 +6,7 @@
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
-import SVIT_EKF.vitekf_utils_core as utils
+import VIT_EKF.vitekf_utils_core as utils
 from types import SimpleNamespace
 from scipy.stats import multivariate_normal
 from matplotlib.patches import Ellipse
