@@ -5,10 +5,10 @@ Usage: python3 main_visual_inertial_tracking_EKF.py
 Requirements: Numpy, Matplotlib, scipy, cv2, skimage, sympy
 """
 
-import SVIT_EKF.vitekf_core           as core
-import SVIT_EKF.vitekf_utils_core     as utils
-import SVIT_EKF.vitekf_utils_oxts     as utils_oxts
-import SVIT_EKF.vitekf_utils_plotting as utils_plt
+import VIT_EKF.vitekf_core           as core
+import VIT_EKF.vitekf_utils_core     as utils
+import VIT_EKF.vitekf_utils_oxts     as utils_oxts
+import VIT_EKF.vitekf_utils_plotting as utils_plt
 import matplotlib.pyplot              as plt
 import copy
 
