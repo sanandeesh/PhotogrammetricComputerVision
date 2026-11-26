@@ -24,7 +24,14 @@ F =  ⎢0.0  cos(δ_pitch)  -sin(δ_pitch)⎥⋅⎢    0.0      1.0     0.0    �
      Is a function of (1) State and (2) Control Inputs
 
 ------------ The Jacobian of the State Transition Model wrt "Control Inputs", `δ_x, δ_z, δ_yaw, δ_pitch`------------ 
+Original Jacobian wrt Control Params:
+     ⎡    -1.0⋅cos(δ_yaw)           -1.0⋅sin(δ_yaw)                -1.0⋅(μₓ - δₓ)⋅sin(δ_yaw) + 1.0⋅(μ_z - δ_z)⋅cos(δ_yaw)                                                           0                                              ⎤
+     ⎢                                                                                                                                                                                                                             ⎥
+ J = ⎢-sin(δ_pitch)⋅sin(δ_yaw)  sin(δ_pitch)⋅cos(δ_yaw)   (μₓ - δₓ)⋅sin(δ_pitch)⋅cos(δ_yaw) + (μ_z - δ_z)⋅sin(δ_pitch)⋅sin(δ_yaw)   -1.0⋅μ_y⋅sin(δ_pitch) + (μₓ - δₓ)⋅sin(δ_yaw)⋅cos(δ_pitch) - (μ_z - δ_z)⋅cos(δ_pitch)⋅cos(δ_yaw)⎥ 
+     ⎢                                                                                                                                                                                                                             ⎥
+     ⎣sin(δ_yaw)⋅cos(δ_pitch)   -cos(δ_pitch)⋅cos(δ_yaw)  -(μₓ - δₓ)⋅cos(δ_pitch)⋅cos(δ_yaw) - (μ_z - δ_z)⋅sin(δ_yaw)⋅cos(δ_pitch)  1.0⋅μ_y⋅cos(δ_pitch) + (μₓ - δₓ)⋅sin(δ_pitch)⋅sin(δ_yaw) - (μ_z - δ_z)⋅sin(δ_pitch)⋅cos(δ_yaw) ⎦
 
+ASSUMING (δ_yaw == δ_pitch == 0.0):
      ⎡-1.0  0   -1.0⋅δ_z + 1.0⋅μ_z      0    ⎤
      ⎢                                       ⎥
  J = ⎢ 0    0           0           δ_z - μ_z⎥
@@ -139,3 +146,42 @@ print("--------------------------------------------------")
 print("Original Jacobian wrt State:")
 sp.pprint(jacobian)
 
+
+# ----------------------------------------------------------
+def ComputeProcessNoiseJacobian():
+    # 1. Define all necessary symbols
+    delta_x, delta_z, delta_yaw, delta_pitch = sp.symbols('delta_x delta_z delta_yaw delta_pitch')
+    mu_x, mu_y, mu_z = sp.symbols('mu_x mu_y mu_z')
+
+    # 2. Define the symbolic matrices as provided
+    R_x = sp.Matrix([[1.0,                    0.0,                   0.0],
+                     [0.0,  sp.cos(delta_pitch), -sp.sin(delta_pitch)],
+                     [0.0,  sp.sin(delta_pitch),  sp.cos(delta_pitch)]])
+
+    R_y = sp.Matrix([[ sp.cos(delta_yaw), 0.0, sp.sin(delta_yaw)],
+                     [              0.0, 1.0,              0.0],
+                     [-sp.sin(delta_yaw), 0.0, sp.cos(delta_yaw)]])
+
+    mu = sp.Matrix([[mu_x],
+                    [mu_y],
+                    [mu_z]])
+
+    delta_shift = sp.Matrix([[delta_x],
+                             [0.0],
+                             [delta_z]])
+
+    # 3. Compute 'mu_predicted' symbolically
+    mu_predicted = R_x * R_y * (mu - delta_shift)
+
+    # 4. Compute the Jacobian matrix 
+    # The variables are passed as a list in the order specified
+    variables = [delta_x, delta_z, delta_yaw, delta_pitch]
+    jacobian_Q = mu_predicted.jacobian(variables)
+
+    # 1. List all input arguments in your desired order
+    all_args = [delta_x, delta_z, delta_yaw, delta_pitch, mu_x, mu_y, mu_z]
+
+    # 2. Compile the symbolic matrix into a fast NumPy function
+    jacobian_func = sp.lambdify(all_args, jacobian_Q, modules='numpy')
+
+    return jacobian_func
