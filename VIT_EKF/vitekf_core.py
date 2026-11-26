@@ -8,7 +8,7 @@
 """
 import numpy as np
 import cv2
-import SVIT_EKF.vitekf_utils_core as utils
+import VIT_EKF.vitekf_utils_core as utils
 from types import SimpleNamespace
 
 
